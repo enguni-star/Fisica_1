@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aula Interativa - Motor Base</title>
+    
+    <!-- SISTEMA ANTI-CRASH -->
+    <script>
+        window.onerror = function(msg, url, line) {
+            const title = document.getElementById('course-title-ui');
+            const sub = document.getElementById('student-name-ui');
+            const icon = document.getElementById('course-icon');
+            if(title) title.innerText = "🚨 Erro Crítico no Código!";
+            if(sub) sub.innerText = `Linha ${line}: ${msg} (Verifique se copiou corretamente)`;
+            if(icon) { icon.className = "fa-solid fa-triangle-exclamation text-2xl text-rose-500"; }
+        };
+    </script>
+
+    <!-- Bibliotecas Externas -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- CONFIGURAÇÃO DO MATHJAX -->
+    <script>
+        window.MathJax = {
+            tex: { inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$', '$$'], ['[', ']']] },
+            svg: { fontCache: 'global' },
+            startup: { typeset: false }
+        };
+    </script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
+    <style>
+        body { font-family: 'Fredoka', sans-serif; background-color: #f0f9ff; color: #334155; }
+        .cartoon-shadow { box-shadow: 4px 6px 0px rgba(30, 41, 59, 1); border: 3px solid #1e293b; }
+        .btn-cartoon { transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); border: 3px solid #1e293b; box-shadow: 0px 4px 0px #1e293b; cursor: pointer; }
+        .btn-cartoon:active:not(:disabled) { transform: translateY(4px); box-shadow: 0px 0px 0px #1e293b; }
+        .btn-cartoon:disabled { filter: grayscale(100%); cursor: not-allowed; box-shadow: 0px 0px 0px #1e293b; transform: translateY(4px); }
+        .level-card { transition: transform 0.3s ease; }
+        .level-card:hover:not(.locked) { transform: scale(1.05); cursor: pointer; }
+        .locked { opacity: 0.6; filter: grayscale(100%); cursor: not-allowed; }
+        .bg-pattern { background-image: radial-gradient(#bae6fd 20%, transparent 20%); background-color: #e0f2fe; background-position: 0 0, 10px 10px; background-size: 20px 20px; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        .dif-1 { background-color: #d1fae5; color: #047857; border: 2px solid #34d399; }
+        .dif-2 { background-color: #fef3c7; color: #b45309; border: 2px solid #fbbf24; }
+        .dif-3 { background-color: #ffe4e6; color: #be123c; border: 2px solid #fb7185; }
+        .hint-box { display: none; background-color: #fef3c7; border-left: 4px solid #f59e0b; padding: 1rem; margin-top: 1rem; border-radius: 0.5rem; }
+    </style>
+</head>
+<body class="bg-pattern min-h-screen flex flex-col">
+
+    <!-- CABEÇALHO -->
+    <header class="bg-sky-500 cartoon-shadow p-4 sticky top-0 z-50 rounded-b-3xl mb-6 mx-2 md:mx-6 mt-0">
+        <div class="max-w-6xl mx-auto flex flex-wrap justify-between items-center gap-4">
+            <div class="flex items-center space-x-3">
+                <div class="bg-white p-2 rounded-xl cartoon-shadow flex items-center justify-center">
+                    <i id="course-icon" class="fa-solid fa-atom text-2xl text-amber-500 animate-spin-slow"></i>
+                </div>
+                <div>
+                    <h1 id="course-title-ui" class="text-2xl font-bold text-white tracking-wide drop-shadow-md">Inicializando Motor...</h1>
+                    <p id="student-name-ui" class="text-sky-100 font-semibold text-sm">Aguarde um instante...</p>
+                </div>
+            </div>
+            <div class="bg-white px-4 py-2 rounded-2xl cartoon-shadow flex items-center space-x-3">
+                <i class="fa-solid fa-star text-amber-400 text-xl"></i>
+                <div class="flex flex-col">
+                    <span class="text-xs text-slate-500 font-bold uppercase">Progresso Geral</span>
+                    <span id="progress-text" class="text-lg font-bold text-emerald-500">0%</span>
+                </div>
+            </div>
+            <button onclick="showScreen('map-screen')" class="btn-cartoon bg-amber-400 hover:bg-amber-300 text-slate-800 px-4 py-2 rounded-xl font-bold">
+                <i class="fa-solid fa-map-location-dot mr-2"></i>Mapa
+            </button>
+        </div>
+    </header>
+
+    <!-- MAPA DE NÍVEIS -->
+    <main id="map-screen" class="flex-1 max-w-6xl mx-auto w-full px-4 pb-10">
+        <div class="bg-white cartoon-shadow rounded-3xl p-6 md:p-8 text-center mb-8 relative overflow-hidden">
+            <div class="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-sky-400 via-indigo-400 to-emerald-400"></div>
+            <h2 class="text-3xl font-bold text-sky-600 mb-2 mt-2">Jornada de Conhecimento: Aula 4</h2>
+            <p class="text-slate-500 font-semibold text-lg">Trabalho, Potência e Energia (Meta: 80%)!</p>
+        </div>
+        <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 md:gap-6" id="levels-grid"></div>
+    </main>
+
+    <!-- TELA DE LIÇÃO -->
+    <main id="lesson-screen" class="hidden flex-1 max-w-3xl mx-auto w-full px-4 pb-10">
+        <div class="bg-white cartoon-shadow rounded-3xl p-6 md:p-8 relative">
+            <button onclick="showScreen('map-screen')" class="absolute -top-4 -right-4 btn-cartoon bg-rose-400 hover:bg-rose-500 text-white w-12 h-12 rounded-full flex items-center justify-center text-xl z-10">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+            <h2 id="lesson-title" class="text-3xl font-bold text-indigo-600 mb-6 border-b-4 border-indigo-100 pb-4">Título</h2>
+            <div id="lesson-content" class="space-y-6 text-slate-600 font-medium text-lg leading-relaxed"></div>
+            
+            <button id="hint-button" onclick="toggleHint()" class="mt-4 text-amber-600 font-bold hover:text-amber-700 transition-colors flex items-center hidden">
+                <i class="fa-solid fa-lightbulb mr-2 text-xl"></i> Mostrar Dica da Aula
+            </button>
+            <div id="lesson-hint" class="hint-box text-sm text-amber-900 font-medium shadow-inner"></div>
+
+            <div class="mt-10 text-center">
+                <button onclick="completeLesson()" class="btn-cartoon bg-emerald-400 hover:bg-emerald-300 text-slate-900 px-8 py-4 rounded-2xl font-bold text-xl w-full flex justify-center items-center transition-colors">
+                    Entendi! Voltar ao Mapa <i class="fa-solid fa-check-circle ml-3 text-2xl text-emerald-800"></i>
+                </button>
+            </div>
+        </div>
+    </main>
+
+    <!-- TELA DE QUIZ -->
+    <main id="quiz-screen" class="hidden flex-1 max-w-3xl mx-auto w-full px-4 pb-10">
+        <div class="bg-white cartoon-shadow rounded-3xl p-6 md:p-8 relative">
+            <button onclick="showScreen('map-screen')" class="absolute -top-4 -right-4 btn-cartoon bg-slate-400 hover:bg-slate-500 text-white w-12 h-12 rounded-full flex items-center justify-center text-xl z-10">
+                <i class="fa-solid fa-arrow-left"></i>
+            </button>
+            <div class="flex flex-col md:flex-row justify-between items-center mb-6 gap-4 border-b-4 border-amber-100 pb-4">
+                <h2 id="quiz-title" class="text-3xl font-bold text-amber-500 drop-shadow-sm">Prova</h2>
+                <div class="bg-amber-100 text-amber-700 px-4 py-2 rounded-xl border-2 border-amber-300 font-bold text-sm flex items-center shadow-inner">
+                    <i class="fa-solid fa-bullseye mr-2"></i> Meta: 80%
+                </div>
+            </div>
+            <div id="quiz-container" class="space-y-8"></div>
+            <div class="mt-10 text-center">
+                <button onclick="submitQuiz()" class="btn-cartoon bg-sky-400 hover:bg-sky-300 text-slate-900 px-8 py-4 rounded-2xl font-bold text-xl w-full transition-colors">
+                    Entregar Prova <i class="fa-solid fa-paper-plane ml-2"></i>
+                </button>
+            </div>
+        </div>
+    </main>
+
+    <!-- MODAL DE RESULTADO -->
+    <div id="result-modal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm hidden items-center justify-center z-[100] px-4 transition-opacity">
+        <div class="bg-white cartoon-shadow rounded-3xl p-8 max-w-md w-full text-center transform scale-95 transition-transform duration-300" id="modal-content">
+            <div id="modal-icon" class="text-7xl mb-4 drop-shadow-md"></div>
+            <h3 id="modal-title" class="text-3xl font-bold mb-2">Resultado</h3>
+            <div class="bg-slate-100 rounded-xl py-4 my-4 border-2 border-slate-200 shadow-inner">
+                <p id="modal-score" class="text-5xl font-extrabold"></p>
+                <p class="text-sm font-bold text-slate-400 mt-1 uppercase tracking-wider">Acertos</p>
+            </div>
+            <p id="modal-msg" class="text-slate-600 font-semibold mb-6 text-lg"></p>
+            <button onclick="closeModal()" class="btn-cartoon bg-sky-400 text-slate-900 px-6 py-3 rounded-xl font-bold w-full text-xl hover:bg-sky-300 transition-colors">
+                Continuar
+            </button>
+        </div>
+    </div>
+
+    <script>
+        const COURSE_DATA = {
+            config: {
+                title: "Unidade 4: Trabalho e Potência",
+                student: "Marlon Cândido",
+                icon: "fa-bolt",
+                passMark: 0.8 
+            },
+            
+            levelsInfo: [
+                { id: 1, type: 'lesson', title: '1. O que é Energia?', icon: 'fa-lightbulb', theme: 'sky' },
+                { id: 2, type: 'lesson', title: '2. Trabalho de Força', icon: 'fa-person-digging', theme: 'indigo' },
+                { id: 3, type: 'lesson', title: '3. Motor x Resistente', icon: 'fa-car-side', theme: 'purple' },
+                { id: 4, type: 'quiz', title: 'Prova 1: Trabalho', icon: 'fa-clipboard-check', theme: 'amber' },
+                { id: 5, type: 'lesson', title: '5. Força com Ângulo', icon: 'fa-angle-up', theme: 'sky' },
+                { id: 6, type: 'lesson', title: '6. Trabalho Nulo', icon: 'fa-ban', theme: 'indigo' },
+                { id: 7, type: 'quiz', title: 'Prova 2: Ângulos', icon: 'fa-list-check', theme: 'amber' },
+                { id: 8, type: 'lesson', title: '8. Gráfico do Trabalho', icon: 'fa-chart-area', theme: 'emerald' },
+                { id: 9, type: 'lesson', title: '9. Trabalho do Peso', icon: 'fa-weight-hanging', theme: 'emerald' },
+                { id: 10, type: 'lesson', title: '10. Força Elástica', icon: 'fa-bacon', theme: 'emerald' }, 
+                { id: 11, type: 'quiz', title: 'Prova 3: Peso e Molas', icon: 'fa-pen-to-square', theme: 'amber' },
+                { id: 12, type: 'lesson', title: '12. Conservativas', icon: 'fa-recycle', theme: 'teal' },
+                { id: 13, type: 'lesson', title: '13. Dissipativas (Atrito)', icon: 'fa-fire', theme: 'rose' },
+                { id: 14, type: 'lesson', title: '14. Potência', icon: 'fa-stopwatch-20', theme: 'teal' },
+                { id: 15, type: 'quiz', title: 'Prova 4: Potência', icon: 'fa-magnifying-glass-chart', theme: 'amber' },
+                { id: 16, type: 'lesson', title: '16. Unidades (W, HP)', icon: 'fa-horse-head', theme: 'sky' },
+                { id: 17, type: 'lesson', title: '17. Potência Instantânea', icon: 'fa-gauge-high', theme: 'indigo' },
+                { id: 18, type: 'lesson', title: '18. Rendimento (η)', icon: 'fa-percent', theme: 'purple' },
+                { id: 19, type: 'lesson', title: '19. Conserv. Máquinas', icon: 'fa-gears', theme: 'purple' },
+                { id: 20, type: 'quiz', title: '20. EXAME FINAL', icon: 'fa-trophy', theme: 'slate' }
+            ],
+
+            lessonsContent: {
+                1: `<p>A <strong>Energia</strong> é a capacidade de realizar trabalho.</p>
+                    <div class="bg-sky-50 border-2 border-sky-200 p-4 rounded-xl mt-4">
+                        <p>🔹 <strong>Lei de Conservação:</strong> A energia não pode ser criada nem destruída. Ela pode ser única e exclusivamente transformada de uma modalidade em outra.</p>
+                    </div>` /*[cite: 80] */,
+                
+                2: `<p>O <strong>Trabalho ($\\tau$)</strong> de uma força constante, paralela ao movimento, é o produto da força pelo deslocamento.</p>
+                    <ul class="list-disc ml-6 mt-4 space-y-2 text-indigo-700 font-semibold">
+                        <li><strong>Fórmula Base:</strong> $\\tau = F \\cdot d$</li>
+                        <li><strong>Unidade no SI:</strong> Joule ($J$), que equivale a Newton $\\times$ metro ($N \\cdot m$).</li>
+                    </ul>` /*[cite: 81] */,
+                
+                3: `<p>O sinal do trabalho indica se a força ajuda ou atrapalha o movimento.</p>
+                    <div class="bg-purple-50 p-4 rounded-xl border-2 border-purple-200 mt-4 mb-4">
+                        <p>🟢 <strong>Trabalho Motor ($\\tau > 0$):</strong> A força favorece o deslocamento (Ex: Peso na queda livre).</p>
+                        <p>🔴 <strong>Trabalho Resistente ($\\tau < 0$):</strong> A força se opõe ao deslocamento (Ex: Peso ao jogar objeto pra cima).</p>
+                    </div>` /*[cite: 82] */,
+                
+                5: `<p>Quando a força não é paralela, precisamos decompor usando o ângulo $\\theta$.</p>
+                    <p class="mt-4 bg-sky-100 p-3 rounded-lg border-2 border-sky-300">Apenas a componente que empurra na direção do movimento realiza trabalho. A fórmula geral vira: <strong>$\\tau = F \\cdot d \\cdot \\cos(\\theta)$</strong>.</p>` /*[cite: 84] */,
+                
+                6: `<p>O <strong>Trabalho Nulo</strong> ocorre quando a força é perpendicular ($90^\\circ$) ao deslocamento.</p>
+                    <div class="bg-indigo-50 border-2 border-indigo-200 p-4 rounded-xl mt-4">
+                        <p>Como $\\cos(90^\\circ) = 0$, o trabalho é zero ($\\tau = 0$).</p>
+                        <p class="mt-2"><strong>Exemplos Clássicos:</strong> Força Normal em superfície horizontal e Força Centrípeta no MCU.</p>
+                    </div>` /*[cite: 85] */,
+                
+                8: `<p>Se a força for <strong>variável</strong>, não podemos usar a fórmula direta.</p>
+                    <ul class="list-disc ml-6 mt-4 space-y-2 text-emerald-700 font-semibold">
+                        <li><strong>Método Gráfico:</strong> O trabalho é numericamente igual à <strong>área sob o gráfico</strong> da Força x Deslocamento ($F \\times d$).</li>
+                    </ul>` /*[cite: 86] */,
+                
+                9: `<p>O <strong>Trabalho do Peso</strong> depende apenas do desnível vertical (altura $h$).</p>
+                    <div class="bg-emerald-50 border-2 border-emerald-300 p-4 rounded-xl mt-4 text-emerald-800">
+                        <p><strong>Fórmula:</strong> $\\tau = \\pm P \\cdot h$</p>
+                        <p class="mt-2"><strong>Regra de Ouro:</strong> O trabalho do peso <strong>independe da trajetória</strong>. Reta, curva ou escada: se a altura é a mesma, o trabalho é o mesmo!</p>
+                    </div>` /*[cite: 87, 88] */,
+
+                10: `<p>A <strong>Força Elástica</strong> em uma mola é variável (Lei de Hooke: $F = k \\cdot x$).</p>
+                     <p class="mt-4">Como o gráfico de $F \\times x$ é um triângulo, a área (Trabalho) fica:</p>
+                     <p class="bg-emerald-100 p-3 rounded border-2 border-emerald-200 text-center font-bold">$\\tau_{el} = \\pm \\frac{k \\cdot x^2}{2}$</p>` /*[cite: 89, 90] */,
+
+                12: `<p>Na Física, forças são classificadas pelo comportamento do seu trabalho.</p>
+                     <div class="bg-teal-50 border-2 border-teal-200 p-4 rounded-xl mt-4">
+                         <p><strong>Forças Conservativas:</strong> O trabalho independe da trajetória, depende apenas do início e fim.</p>
+                         <p><strong>Exemplos:</strong> Força Peso e Força Elástica.</p>
+                     </div>` /*[cite: 91] */,
+
+                13: `<p>As <strong>Forças Dissipativas</strong> dependem do caminho percorrido.</p>
+                     <p class="mt-4 bg-rose-50 p-3 rounded border-2 border-rose-200">Elas transformam energia mecânica em calor (energia térmica). O maior exemplo é a <strong>Força de Atrito</strong>, cujo trabalho é sempre resistente (negativo) pois se opõe ao escorregamento.</p>` /*[cite: 92] */,
+
+                14: `<p>A <strong>Potência ($P$)</strong> mede a rapidez (ritmo) com que um trabalho é realizado.</p>
+                     <ul class="bg-teal-50 p-4 rounded-xl border-2 border-teal-200 mt-4 space-y-2 text-teal-800 text-sm">
+                         <li><strong>Fórmula:</strong> $P = \\frac{\\tau}{\\Delta t}$</li>
+                         <li>Máquinas mais potentes realizam o mesmo trabalho em menos tempo.</li>
+                     </ul>` /*[cite: 93] */,
+
+                16: `<p>Unidades de Potência:</p>
+                     <div class="bg-sky-50 border-2 border-sky-200 p-4 rounded-xl mt-4 text-sky-800">
+                         <p>🔹 <strong>No SI:</strong> Watt ($W$), que é Joule por segundo ($J/s$).</p>
+                         <p>🔹 <strong>Práticas:</strong> Horse Power ($1~HP \\approx 746~W$) e Cavalo-vapor ($1~cv \\approx 735~W$).</p>
+                     </div>` /*[cite: 94] */,
+
+                17: `<p>Se a força for constante e na mesma direção do movimento, podemos usar a <strong>Potência Instantânea</strong>.</p>
+                     <ul class="list-disc ml-6 mt-4 font-bold text-indigo-700">
+                         <li>Substituindo $\\tau$ por $F \\cdot d$, chegamos a: $P = F \\cdot v$.</li>
+                         <li>A Potência é a Força multiplicada pela velocidade ($v$).</li>
+                     </ul>` /*[cite: 95] */,
+                     
+                18: `<p>O <strong>Rendimento ($\\eta$)</strong> indica a eficiência de uma máquina.</p>
+                     <div class="bg-purple-50 border-2 border-purple-200 p-4 rounded-xl mt-4">
+                         <p><strong>Fórmula:</strong> $\\eta = \\frac{P_u}{P_t}$ (Útil dividida pela Total).</p>
+                         <p>O rendimento é sempre um número entre 0 e 1 (ou $0\\%$ a $100\\%$).</p>
+                     </div>` /*[cite: 96] */,
+                     
+                19: `<p>Nenhuma máquina é perfeita. A energia total fornecida sempre se divide:</p>
+                     <p class="mt-4 text-center font-bold text-lg text-purple-700">Potência Total = Pot. Útil + Pot. Dissipada</p>
+                     <p class="mt-2 text-sm">A parte dissipada geralmente vira calor ou som.</p>` /*[cite: 96] */
+            },
+
+            hints: {
+                1: "Energia não surge do nada, ela se transforma." /*[cite: 80] */,
+                2: "Trabalho = Força multiplicada pela Distância." /*[cite: 81] */,
+                3: "Se ajuda, é motor (+). Se atrapalha o movimento, é resistente (-)." /*[cite: 82] */,
+                5: "Usa-se o cosseno do ângulo porque só importa a parte da força que vai na mesma linha do movimento." /*[cite: 84] */,
+                6: "Fazer força para baixo enquanto o bloco anda para frente não gera trabalho." /*[cite: 85] */,
+                8: "Pinte o gráfico embaixo da linha até o eixo. Essa área é o seu Trabalho." /*[cite: 86] */,
+                9: "Pra gravidade, não importa se você desceu de escada ou escorregador, só a altura." /*[cite: 88] */,
+                10: "A força da mola forma um triângulo no gráfico, por isso divide por 2." /*[cite: 89, 90] */,
+                12: "Conservar significa que o caminho do meio não gasta a energia." /*[cite: 91] */,
+                13: "Se você raspar o pé no chão, vai esquentar e perder energia (dissipar)." /*[cite: 92] */,
+                14: "Potência é a velocidade que a sua energia é gasta ou gerada." /*[cite: 93] */,
+                16: "Watt é o mesmo que Joule a cada segundo." /*[cite: 94] */,
+                17: "Força vezes Velocidade te dá a potência na hora." /*[cite: 95] */,
+                18: "O rendimento é o que você aproveita dividido por tudo que você gastou.",
+                19: "Total = Útil + O que perdeu pelo caminho." /*[cite: 96] */
+            },
+
+            quizzesData: {
+                4: [ 
+                    { q: "Qual a definição prática de Energia para a Mecânica?", o: ["A velocidade máxima de um corpo", "O calor gerado por um atrito", "A capacidade de realizar trabalho", "A força multiplicada pelo tempo"], c: 2, d: 1, h: "Energia é vista como o 'combustível' para executar uma ação mecânica." /*[cite: 80] */ },
+                    { q: "A Lei de Conservação da Energia afirma que a energia:", o: ["Pode ser criada por reatores", "É destruída pelo atrito", "Some no vácuo", "Não pode ser criada nem destruída, apenas transformada"], c: 3, d: 1, h: "A quantidade total de energia no universo é sempre constante." /*[cite: 80] */ },
+                    { q: "A unidade de Trabalho no Sistema Internacional (SI) é o:", o: ["Newton (N)", "Joule (J)", "Watt (W)", "Kelvin (K)"], c: 1, d: 1, h: "Essa unidade equivale a Newton x metro ($N \\cdot m$)." /*[cite: 81] */ },
+                    { q: "A fórmula básica para calcular o trabalho ($\\tau$) de uma força paralela ao movimento é:", o: ["$\\tau = F + d$", "$\\tau = F / d$", "$\\tau = F \\cdot d$", "$\\tau = m \\cdot g$"], c: 2, d: 1, h: "É a força aplicada multiplicada pelo quanto o objeto andou." /*[cite: 81] */ },
+                    { q: "Quando a força atua no MESMO sentido do deslocamento (ajudando o movimento), o trabalho é chamado de:", o: ["Resistente e negativo", "Nulo", "Motor e positivo", "Dissipativo"], c: 2, d: 2, h: "Pense em um 'motor' que empurra o carro para frente." /*[cite: 82] */ },
+                    { q: "Quando a força atua em sentido OPOSTO ao deslocamento (atrapalhando), o trabalho é:", o: ["Motor", "Constante", "Resistente ($\\tau < 0$)", "Acelerado"], c: 2, d: 2, h: "Ele resiste ao movimento, portanto ganha sinal negativo." /*[cite: 82] */ },
+                    { q: "Um objeto cai em queda livre. A Força Peso atua para baixo. O trabalho do Peso neste caso é:", o: ["Resistente", "Nulo", "Motor", "Infinito"], c: 2, d: 2, h: "O objeto vai pra baixo e a força aponta pra baixo. Eles são amigos." /*[cite: 82] */ },
+                    { q: "O trabalho é classificado como qual tipo de grandeza física?", o: ["Vetorial", "Adimensional", "Cinemática", "Escalar"], c: 3, d: 3, h: "Ele não tem 'direção e sentido', é apenas um número de energia." /*[cite: 83] */ },
+                    { q: "Se uma força de 10 N empurra um bloco por 5 metros na mesma direção, qual o trabalho realizado?", o: ["15 J", "50 J", "2 J", "0 J"], c: 1, d: 3, h: "Basta multiplicar a Força pela Distância (10 $\\times$ 5)." /*[cite: 81] */ },
+                    { q: "Sobre o Trabalho, é correto afirmar que ele:", o: ["Independe do referencial", "Depende do referencial adotado", "É sempre positivo", "Só existe em trajetórias curvas"], c: 1, d: 3, h: "O deslocamento depende de onde você está olhando, logo o trabalho também." /*[cite: 83] */ }
+                ],
+                7: [ 
+                    { q: "Se a força formar um ângulo $\\theta$ com o deslocamento, a fórmula do trabalho utiliza qual função?", o: ["Seno", "Tangente", "Logaritmo", "Cosseno ($\\tau = F \\cdot d \\cdot \\cos \\theta$)"], c: 3, d: 1, h: "Queremos a projeção 'colada' (adjacente) ao chão." /*[cite: 84] */ },
+                    { q: "Quando a força atua num ângulo de 90° (perpendicular) em relação ao deslocamento, o trabalho é:", o: ["Máximo", "Nulo ($\\tau = 0$)", "Negativo", "Dobrado"], c: 1, d: 1, h: "O $\\cos(90^\\circ)$ é igual a zero." /*[cite: 85] */ },
+                    { q: "A Força Normal atuando em um bloco que desliza sobre uma mesa horizontal realiza um trabalho:", o: ["Motor", "Resistente", "Nulo", "Variável"], c: 2, d: 1, h: "A normal aponta pra cima (90°) e o bloco vai pro lado. Cruzou a 90° = Zero." /*[cite: 85] */ },
+                    { q: "A força Centrípeta no Movimento Circular Uniforme realiza qual tipo de trabalho?", o: ["Motor", "Nulo", "Resistente", "Dissipativo"], c: 1, d: 2, h: "A centrípeta aponta pro centro, perpendicular (90°) à velocidade na borda." /*[cite: 85] */ },
+                    { q: "Se o ângulo $\\theta$ for maior que $90^\\circ$ e menor ou igual a $180^\\circ$ (cosseno negativo), o trabalho é:", o: ["Motor", "Nulo", "Escalar", "Resistente"], c: 3, d: 2, h: "Cosseno negativo gera trabalho negativo, que atrapalha." /*[cite: 85] */ },
+                    { q: "Quando a força NÃO é constante, o método usado para calcular o trabalho é:", o: ["A fórmula de Pitágoras", "A área sob o gráfico Força x Deslocamento ($F \\times d$)", "A divisão da força pelo tempo", "Impossível de calcular"], c: 1, d: 2, h: "Em gráficos $F \\times d$, pinte o desenho e calcule o tamanho da forma." /*[cite: 86] */ },
+                    { q: "A fórmula $\\tau = F_t \\cdot d$ significa que apenas qual componente da força realiza trabalho?", o: ["A perpendicular ao movimento", "A componente de atrito", "A projetada paralelamente à direção do deslocamento", "A força peso"], c: 2, d: 3, h: "Se a força tá torta, só importa o pedaço dela que empurra reto pra frente." /*[cite: 84] */ },
+                    { q: "Um homem carrega uma mala andando em linha reta horizontal. O trabalho da força que ele faz para sustentar a mala (pra cima) é:", o: ["Nulo", "Motor", "Resistente", "Variável"], c: 0, d: 3, h: "Ele puxa pra cima e anda pro lado. Ângulo de 90°." /*[cite: 85] */ },
+                    { q: "O que acontece com o trabalho se o $\\cos(\\theta) = 1$ (ou seja, ângulo de $0^\\circ$)?", o: ["O trabalho é nulo", "O trabalho é máximo e motor", "O trabalho é máximo e resistente", "A força desaparece"], c: 1, d: 3, h: "Ângulo zero significa força 100% alinhada a favor do movimento." /*[cite: 85] */ },
+                    { q: "Em um gráfico de Força Variável, se o desenho formado for um triângulo, a área (trabalho) será:", o: ["Base $\\times$ Altura", "(Base $\\times$ Altura) / 2", "Base + Altura", "Base / Altura"], c: 1, d: 3, h: "A área de um triângulo é metade da área de um retângulo." /*[cite: 90] */ }
+                ],
+                11: [ 
+                    { q: "O Trabalho da Força Peso em uma queda vertical depende de quais fatores?", o: ["Do tempo de queda", "Da aerodinâmica", "Apenas do Peso e do desnível (altura $h$)", "Da velocidade final"], c: 2, d: 1, h: "Lembra da fórmula: $\\tau = P \\cdot h$." /*[cite: 87] */ },
+                    { q: "Se um corpo SOBE (é atirado para cima), o trabalho do Peso é:", o: ["$\\tau = 0$", "Motor ($\\tau = +P \\cdot h$)", "Resistente ($\\tau = -P \\cdot h$)", "Exponencial"], c: 2, d: 1, h: "O Peso sempre puxa pra baixo. Se o corpo sobe, o Peso atrapalha (negativo)." /*[cite: 87] */ },
+                    { q: "O Trabalho do Peso de um objeto que rola uma ladeira curva, comparado ao de cair direto da mesma altura, é:", o: ["Maior", "Menor", "O mesmo (independe da trajetória)", "Zero"], c: 2, d: 1, h: "A força peso não liga para o caminho, apenas para onde começou e onde terminou." /*[cite: 88] */ },
+                    { q: "A Força Elástica é definida por qual Lei?", o: ["Lei de Newton", "Lei de Hooke ($F_{el} = k \\cdot x$)", "Lei de Conservação", "Lei de Ohm"], c: 1, d: 2, h: "Ela diz que a força depende da constante da mola ($k$) e do quanto ela esticou ($x$)." /*[cite: 89] */ },
+                    { q: "A fórmula do Trabalho da Força Elástica ($\\tau_{el}$) é:", o: ["$k \\cdot x$", "$k \\cdot x^2$", "$P \\cdot h$", "$(k \\cdot x^2) / 2$"], c: 3, d: 2, h: "Vem da área de um triângulo gerado pelo gráfico da mola." /*[cite: 89, 90] */ },
+                    { q: "No gráfico da Força Elástica x Deformação ($F \\times x$), a reta passa pela origem. A área sob essa reta tem formato de:", o: ["Retângulo", "Círculo", "Triângulo", "Parábola"], c: 2, d: 2, h: "Começa no zero e sobe em linha reta inclinada." /*[cite: 90] */ },
+                    { q: "Se um bloco deforma uma mola pra frente ($x$), e a mola puxa ele pra trás, o trabalho da mola é:", o: ["Motor", "Resistente (negativo)", "Nulo", "Crescente positivo"], c: 1, d: 3, h: "A mola sempre tenta voltar pro original. Se opõe = negativo." /*[cite: 89] */ },
+                    { q: "O trabalho do Peso num deslocamento puramente horizontal é:", o: ["Nulo ($\\tau = 0$)", "Igual a $P \\cdot h$", "Positivo", "Negativo"], c: 0, d: 3, h: "Não teve desnível vertical ($h=0$), ou seja, formou 90° com a gravidade." /*[cite: 87] */ },
+                    { q: "A constante '$k$' na fórmula elástica representa:", o: ["A energia térmica", "A constante de atrito", "A constante elástica da mola (rigidez)", "O tamanho da mola em repouso"], c: 2, d: 3, h: "Quanto maior o K, mais 'dura' é a mola de puxar." /*[cite: 89] */ },
+                    { q: "Por que não podemos calcular o trabalho elástico apenas fazendo $F \\cdot x$?", o: ["Porque a mola não tem atrito", "Porque a força elástica é VARIÁVEL", "Porque a mola é curva", "Podemos usar, está correto"], c: 1, d: 3, h: "A força muda o tempo todo conforme você estica, por isso tem que usar a área (gráfico)." /*[cite: 89, 90] */ }
+                ],
+                15: [ 
+                    { q: "Forças cujo trabalho independe da trajetória e só importa início e fim são chamadas de:", o: ["Dissipativas", "Variáveis", "De Atrito", "Conservativas"], c: 3, d: 1, h: "Elas 'poupam' a energia mecânica do sistema." /*[cite: 91] */ },
+                    { q: "A Força de Atrito é um exemplo clássico de força:", o: ["Conservativa", "Motora", "Nula", "Dissipativa (Não Conservativa)"], c: 3, d: 1, h: "Ela rouba a energia de movimento e joga fora como calor." /*[cite: 92] */ },
+                    { q: "O trabalho da Força de Atrito cinético é sempre:", o: ["Motor (+)", "Resistente (-)", "Nulo (0)", "Paralelo"], c: 1, d: 1, h: "O atrito SEMPRE atrapalha o movimento." /*[cite: 92] */ },
+                    { q: "A Potência ($P$) é a grandeza escalar que mede a razão entre o Trabalho e o:", o: ["Deslocamento", "Tempo ($\\Delta t$)", "Atrito", "Rendimento"], c: 1, d: 2, h: "Potência é a *rapidez* com que a energia é usada." /*[cite: 93] */ },
+                    { q: "Se duas máquinas fazem o mesmo trabalho, a mais POTENTE é a que:", o: ["Gasta mais energia", "Faz em MAIS tempo", "Faz em MENOS tempo", "É mais pesada"], c: 2, d: 2, h: "Se eu ergo o mesmo peso em 1s e você em 10s, eu tenho mais potência que você." /*[cite: 93] */ },
+                    { q: "Qual a unidade oficial de Potência no Sistema Internacional (SI)?", o: ["Newton (N)", "Horse Power (HP)", "Joule (J)", "Watt (W)"], c: 3, d: 2, h: "Significa 1 Joule dividido por 1 Segundo ($J/s$)." /*[cite: 94] */ },
+                    { q: "Por que o trabalho de forças dissipativas em um caminho fechado (ida e volta para o mesmo ponto) é diferente de zero?", o: ["Porque ela vira força peso", "Porque a energia é multiplicada", "Porque ela depende da trajetória, dissipando energia na ida e na volta", "Porque ela some"], c: 2, d: 3, h: "Diferente do peso, que zera, o atrito raspou o chão indo e raspou voltando." /*[cite: 92] */ },
+                    { q: "As unidades Cavalo-Vapor (CV) e Horse Power (HP) são:", o: ["Unidades práticas comerciais/industriais de Potência", "Unidades obsoletas de velocidade", "Unidades de força animal", "Unidades do SI para Energia"], c: 0, d: 3, h: "Você vê muito isso em motores de carros e máquinas." /*[cite: 94] */ },
+                    { q: "Se $1~HP \\approx 746~W$, um motor de 2 HP tem aproximadamente quantos Watts?", o: ["$746~W$", "$1492~W$", "$1000~W$", "$500~W$"], c: 1, d: 3, h: "É só multiplicar 746 por 2." /*[cite: 94] */ },
+                    { q: "O atrito 'dissipa' a energia mecânica do sistema transformando-a principalmente em:", o: ["Luz", "Massa", "Energia Térmica (Calor)", "Gravidade"], c: 2, d: 3, h: "Esfregue suas mãos rápido. O que você sente?" /*[cite: 92] */ }
+                ],
+                20: [ 
+                    { q: "O conceito primário de Energia Mecânica define que ela é a:", o: ["Massa vezes aceleração", "A capacidade de realizar trabalho", "A taxa de tempo do movimento", "A força centrípeta"], c: 1, d: 1, h: "Trabalho e Energia andam de mãos dadas, são como moedas diferentes pro mesmo valor." /*[cite: 80] */ },
+                    { q: "Na fórmula do Rendimento ($\\eta = P_u / P_t$), o valor do rendimento sempre será:", o: ["Maior que 100%", "Negativo", "Um número entre 0 e 1 (ou $0\\%$ a $100\\%$)", "Exatamente 1.0 (100%) para máquinas reais"], c: 2, d: 1, h: "Você nunca pode gerar mais energia do que a máquina consumiu na tomada." },
+                    { q: "Qual a fórmula da Potência Instantânea quando a força é constante e alinhada ao movimento?", o: ["$P = F / v$", "$P = F + v$", "$P = F \\cdot v$", "$P = v / F$"], c: 2, d: 1, h: "Vem de substituir 'distância sobre tempo' por 'velocidade'." /*[cite: 95] */ },
+                    { q: "Pelo Princípio da Conservação de Máquinas, a Potência Total recebida se divide em:", o: ["Potência Nula e Constante", "Potência Útil e Potência Dissipada", "Potência Motora e Peso", "Potência Elástica e Gravidade"], c: 1, d: 1, h: "O que entra = O que funciona + O que vaza." /*[cite: 96] */ },
+                    { q: "A força centrípeta nunca altera a energia cinética do corpo (MCU) porque seu trabalho é:", o: ["Infinito", "Negativo", "Nulo ($\\tau = 0$)", "Maior que a tangente"], c: 2, d: 1, h: "Ela faz $90^\\circ$ com a trajetória, então não realiza trabalho." /*[cite: 85] */ },
+                    { q: "Um carro freia. A força dos freios atua oposta ao deslocamento. O trabalho é:", o: ["Nulo", "Resistente", "Motor", "Potente"], c: 1, d: 1, h: "Atrapalha o movimento = sinal negativo." /*[cite: 82] */ },
+                    { q: "O Trabalho do Peso de uma maçã caindo 2 metros é:", o: ["$P/2$", "$2+P$", "Nulo", "Positivo e vale $P \\cdot 2$"], c: 3, d: 2, h: "Caiu = a favor da gravidade. Fórmula: $+ P \\cdot h$." /*[cite: 87] */ },
+                    { q: "O que a Força Peso e a Força Elástica têm em comum?", o: ["São dissipativas", "Não realizam trabalho", "Ambas são Forças Conservativas", "Apontam sempre para cima"], c: 2, d: 2, h: "Nenhuma das duas perde a energia no caminho percorrido." /*[cite: 91] */ },
+                    { q: "O Joule (J) equivale matematicamente a:", o: ["Newton $\\times$ segundo", "Watt / metro", "Newton $\\times$ metro ($N \\cdot m$)", "Kg $\\times$ m"], c: 2, d: 2, h: "Força (Newton) multiplicada pela Distância (Metro)." /*[cite: 81] */ },
+                    { q: "Qual máquina tem MAIOR Rendimento percentual?", o: ["A que dissipa a MAIOR parte da energia", "A que tem Potência Útil mais próxima do ZERO", "A que transforma a MAIOR parte da energia em Potência Útil", "A mais pesada"], c: 2, d: 2, h: "Eficiência é conseguir usar o máximo daquilo que consome." /*[cite: 96] */ },
+                    { q: "O Trabalho de Força Variável no gráfico da Lei de Hooke (Mola) resulta numa área de:", o: ["Retângulo ($k \\cdot x$)", "Triângulo ($(k \\cdot x^2) / 2$)", "Círculo", "Parábola"], c: 1, d: 2, h: "O gráfico da mola ($F=kx$) é uma reta cortando a origem." /*[cite: 89, 90] */ },
+                    { q: "Se a força formar um ângulo de 60° com o chão, devo multiplicar $F \\cdot d$ por:", o: ["Seno de 60°", "Cosseno de 60°", "Tangente de 60°", "1"], c: 1, d: 2, h: "A fórmula é $F \\cdot d \\cdot \\cos(\\theta)$." /*[cite: 84] */ },
+                    { q: "Trabalho em percurso fechado (ida e volta) é DIFERENTE de zero apenas para as forças:", o: ["Conservativas", "Dissipativas (como atrito)", "Elásticas", "Gravitacionais"], c: 1, d: 2, h: "Porque elas continuam 'roubando' energia o tempo todo, na ida e na volta." /*[cite: 92] */ },
+                    { q: "Por que uma lâmpada comum (incandescente) tem baixo rendimento?", o: ["Porque gera muita luz", "Porque não consome energia", "Porque dissipa quase toda energia como Calor em vez de Luz", "Porque usa potência nula"], c: 2, d: 3, h: "A função (útil) dela é dar luz, se ela esquenta demais, está desperdiçando (dissipando) energia." /*[cite: 96] */ },
+                    { q: "1 Watt (W) no SI representa exatamente a taxa de:", o: ["1 Joule transferido em 1 minuto", "1 Newton gerado a cada 1 metro", "1 Joule de trabalho a cada 1 segundo ($1~J/s$)", "1 HP por segundo"], c: 2, d: 3, h: "Potência é a Energia / Tempo (Joule / Segundo)." /*[cite: 94] */ },
+                    { q: "Um elevador sobe erguendo 5000 N por 10 metros de altura em 10 segundos. Qual a sua Potência Média?", o: ["$500~W$", "$50.000~W$", "$5.000~W$", "$10~W$"], c: 2, d: 3, h: "Primeiro ache o trabalho ($F \\times d$ = $5000 \\times 10$). Depois divida pelo tempo ($50000 / 10$)." /*[cite: 81, 93] */ },
+                    { q: "O trabalho é uma grandeza _________ e sua unidade deriva do produto de dois vetores.", o: ["Vetorial", "Inexistente", "Escalar", "Ficcional"], c: 2, d: 3, h: "Ele não tem setinha pra cima nem pra baixo. É só um valor de energia." /*[cite: 83] */ },
+                    { q: "Se o rendimento de um motor é de 80% (0,8), isso significa que:", o: ["Ele esquenta 80% e anda 20%", "Ele dissipa 80% da energia", "Ele transforma 80% da energia que consome em Trabalho Útil", "Ele tem 80 HP de limite"], c: 2, d: 3, h: "Ele aproveita muito bem a energia e só perde 20% como lixo/calor." /*[cite: 96] */ },
+                    { q: "Se um bloco sobe uma rampa de 3m de altura (h) ou sobe um elevador vertical da mesma altura (h), o trabalho do PESO é:", o: ["O mesmo nas duas situações", "Maior na rampa", "Maior no elevador", "Nulo na rampa"], c: 0, d: 3, h: "O trabalho do peso NÃO depende da trajetória." /*[cite: 88] */ },
+                    { q: "Potência Útil = $800~W$, Potência Dissipada = $200~W$. Qual o rendimento?", o: ["0.2 (20%)", "1.0 (100%)", "0.8 (80%)", "0.6 (60%)"], c: 2, d: 3, h: "Primeiro ache o Total ($800+200=1000$). Depois divida Útil pelo Total ($800/1000$)." /*[cite: 96] */ }
+                ]
+            }
+        };
+
+        let unlockedLevels = 1;
+        let currentActiveLevel = 1;
+        let currentQuizAnswers = [];
+
+        function renderMathSafe() {
+            if (typeof MathJax !== 'undefined' && MathJax.typesetPromise) {
+                MathJax.typesetPromise().catch(() => console.warn('Aviso: Renderização das fórmulas falhou.'));
+            }
+        }
+
+        function initEngine() {
+            document.title = COURSE_DATA.config.title;
+            document.getElementById('course-title-ui').innerText = COURSE_DATA.config.title;
+            document.getElementById('student-name-ui').innerText = `Estudante: ${COURSE_DATA.config.student}`;
+            document.getElementById('course-icon').className = `fa-solid ${COURSE_DATA.config.icon} text-2xl text-amber-500`;
+
+            renderMap();
+            updateProgress();
+        }
+
+        function renderMap() {
+            const grid = document.getElementById('levels-grid');
+            grid.innerHTML = '';
+            
+            const THEMES = {
+                sky: { text: 'text-sky-600', bg: 'bg-sky-100', border: 'border-sky-400' },
+                indigo: { text: 'text-indigo-600', bg: 'bg-indigo-100', border: 'border-indigo-400' },
+                amber: { text: 'text-amber-600', bg: 'bg-amber-100', border: 'border-amber-400' },
+                emerald: { text: 'text-emerald-600', bg: 'bg-emerald-100', border: 'border-emerald-400' },
+                purple: { text: 'text-purple-600', bg: 'bg-purple-100', border: 'border-purple-400' },
+                rose: { text: 'text-rose-600', bg: 'bg-rose-100', border: 'border-rose-400' },
+                teal: { text: 'text-teal-600', bg: 'bg-teal-100', border: 'border-teal-400' },
+                slate: { text: 'text-yellow-500', bg: 'bg-slate-800', border: 'border-yellow-500' }
+            };
+
+            COURSE_DATA.levelsInfo.forEach(lvl => {
+                const isUnlocked = lvl.id <= unlockedLevels;
+                const stateClass = isUnlocked ? 'bg-white hover:bg-slate-50' : 'bg-slate-100 locked';
+                const theme = THEMES[lvl.theme] || THEMES.sky;
+                const iconColor = isUnlocked ? theme.text : 'text-slate-400';
+                const borderColor = isUnlocked ? theme.border : 'border-slate-300';
+                const titleColor = isUnlocked ? 'text-slate-800' : 'text-slate-400';
+
+                let checkBadge = '';
+                if(isUnlocked && lvl.id < unlockedLevels) {
+                    checkBadge = `<div class="absolute -top-3 -right-3 bg-emerald-400 text-white w-8 h-8 rounded-full border-2 border-emerald-600 flex items-center justify-center font-bold shadow-md z-10"><i class="fa-solid fa-check"></i></div>`;
+                }
+
+                grid.innerHTML += `
+                    <div onclick="openLevel(${lvl.id}, ${isUnlocked})" class="level-card cartoon-shadow rounded-2xl p-4 flex flex-col items-center justify-center text-center h-32 md:h-40 ${stateClass} border-2 ${borderColor} relative">
+                        <i class="fa-solid ${lvl.icon} text-3xl md:text-4xl mb-3 ${iconColor}"></i>
+                        <span class="font-bold text-[11px] md:text-sm ${titleColor} leading-tight">${lvl.title}</span>
+                        ${!isUnlocked ? '<div class="absolute inset-0 bg-slate-900/10 rounded-xl flex items-center justify-center"><i class="fa-solid fa-lock text-2xl text-slate-500 bg-white p-2 rounded-full cartoon-shadow"></i></div>' : ''}
+                        ${checkBadge}
+                    </div>
+                `;
+            });
+        }
+
+        function updateProgress() {
+            const total = COURSE_DATA.levelsInfo.length;
+            const percent = Math.floor(((unlockedLevels - 1) / total) * 100);
+            document.getElementById('progress-text').innerText = `${percent}%`;
+        }
+
+        function showScreen(screenId) {
+            ['map-screen', 'lesson-screen', 'quiz-screen'].forEach(id => {
+                document.getElementById(id).classList.add('hidden');
+            });
+            document.getElementById(screenId).classList.remove('hidden');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function toggleHint() {
+            const hintBox = document.getElementById('lesson-hint');
+            if (hintBox.style.display === 'block') {
+                hintBox.style.display = 'none';
+            } else {
+                hintBox.style.display = 'block';
+            }
+        }
+
+        window.toggleQuizHint = function(index) {
+            const hintDiv = document.getElementById(`hint-q${index}`);
+            if (hintDiv.classList.contains('hidden')) {
+                hintDiv.classList.remove('hidden');
+            } else {
+                hintDiv.classList.add('hidden');
+            }
+        };
+
+        function openLevel(id, isUnlocked) {
+            if (!isUnlocked) return;
+            currentActiveLevel = id;
+            const levelObj = COURSE_DATA.levelsInfo.find(l => l.id === id);
+
+            if (levelObj.type === 'lesson' || levelObj.type === 'lab') {
+                document.getElementById('lesson-title').innerText = levelObj.title;
+                const content = COURSE_DATA.lessonsContent[id] || `<p class="text-center font-bold text-slate-400">Conteúdo não preenchido.</p>`;
+                document.getElementById('lesson-content').innerHTML = content;
+                
+                const hintButton = document.getElementById('hint-button');
+                const hintBox = document.getElementById('lesson-hint');
+                hintBox.style.display = 'none'; 
+                
+                if (COURSE_DATA.hints[id]) {
+                    hintBox.innerText = `💡 Dica Rápida: ${COURSE_DATA.hints[id]}`;
+                    hintButton.classList.remove('hidden');
+                } else {
+                    hintButton.classList.add('hidden');
+                }
+
+                showScreen('lesson-screen');
+                renderMathSafe();
+                
+            } else if (levelObj.type === 'quiz') {
+                document.getElementById('quiz-title').innerText = levelObj.title;
+                buildQuiz(id);
+                showScreen('quiz-screen');
+                renderMathSafe();
+            }
+        }
+
+        function completeLesson() {
+            if (currentActiveLevel === unlockedLevels) {
+                unlockedLevels++;
+                renderMap();
+                updateProgress();
+            }
+            showScreen('map-screen');
+        }
+
+        function buildQuiz(id) {
+            const container = document.getElementById('quiz-container');
+            container.innerHTML = '';
+            
+            const questions = COURSE_DATA.quizzesData[id] || [];
+            currentQuizAnswers = new Array(questions.length).fill(null);
+            
+            questions.forEach((qObj, qIndex) => {
+                let optionsHTML = '';
+                qObj.o.forEach((optStr, oIndex) => {
+                    optionsHTML += `
+                        <label class="flex items-center space-x-3 p-4 bg-slate-50 border-2 border-slate-200 rounded-xl cursor-pointer hover:bg-sky-50 transition-colors">
+                            <input type="radio" name="q${qIndex}" value="${oIndex}" onchange="selectAnswer(${qIndex}, ${oIndex})" class="w-6 h-6 text-sky-500 border-slate-300 focus:ring-sky-500 cursor-pointer">
+                            <span class="font-semibold text-slate-700 text-lg w-full">${optStr}</span>
+                        </label>
+                    `;
+                });
+
+                let difTag = '';
+                if(qObj.d === 1) difTag = `<span class="dif-1 px-3 py-1 rounded-lg text-xs font-bold float-right uppercase tracking-wider">Fácil</span>`;
+                else if(qObj.d === 2) difTag = `<span class="dif-2 px-3 py-1 rounded-lg text-xs font-bold float-right uppercase tracking-wider">Média</span>`;
+                else if(qObj.d === 3) difTag = `<span class="dif-3 px-3 py-1 rounded-lg text-xs font-bold float-right uppercase tracking-wider">Difícil</span>`;
+
+                let hintHTML = '';
+                if(qObj.h) {
+                    hintHTML = `
+                        <div class="mt-4 pt-2 border-t-2 border-slate-100">
+                            <button onclick="toggleQuizHint(${qIndex})" class="text-amber-500 font-bold hover:text-amber-600 text-sm flex items-center transition-colors">
+                                <i class="fa-solid fa-lightbulb mr-2"></i> Precisa de uma dica?
+                            </button>
+                            <div id="hint-q${qIndex}" class="hidden mt-3 p-3 bg-amber-50 border-l-4 border-amber-400 rounded-r-lg text-sm text-amber-800 font-medium shadow-sm transition-all">
+                                ${qObj.h}
+                            </div>
+                        </div>
+                    `;
+                }
+
+                container.innerHTML += `
+                    <div class="bg-white p-6 md:p-8 rounded-3xl border-2 border-slate-200 shadow-sm relative overflow-hidden">
+                        <div class="absolute top-0 left-0 w-2 h-full bg-amber-400"></div>
+                        <div class="mb-5 pl-2">
+                            ${difTag}
+                            <p class="font-bold text-xl text-slate-800 pr-20">${qIndex + 1}. ${qObj.q}</p>
+                        </div>
+                        <div class="space-y-3">
+                            ${optionsHTML}
+                        </div>
+                        ${hintHTML}
+                    </div>
+                `;
+            });
+        }
+
+        function selectAnswer(qIndex, oIndex) {
+            currentQuizAnswers[qIndex] = oIndex;
+        }
+
+        function submitQuiz() {
+            if (currentQuizAnswers.includes(null)) {
+                const faltando = currentQuizAnswers.filter(ans => ans === null).length;
+                alert(`Faltam responder ${faltando} pergunta(s) antes de entregar.`);
+                return;
+            }
+
+            const questions = COURSE_DATA.quizzesData[currentActiveLevel];
+            let score = 0;
+            currentQuizAnswers.forEach((ans, idx) => {
+                if (ans === questions[idx].c) score++;
+            });
+
+            const total = questions.length;
+            const percentage = Math.round((score / total) * 100);
+            const passTarget = Math.ceil(total * COURSE_DATA.config.passMark);
+            const passed = score >= passTarget;
+
+            showResultModal(passed, score, total, percentage, passTarget);
+        }
+
+        function showResultModal(passed, score, total, pct, passTarget) {
+            const modal = document.getElementById('result-modal');
+            const icon = document.getElementById('modal-icon');
+            const title = document.getElementById('modal-title');
+            const scoreTxt = document.getElementById('modal-score');
+            const msg = document.getElementById('modal-msg');
+            const content = document.getElementById('modal-content');
+
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            
+            setTimeout(() => {
+                modal.classList.remove('opacity-0');
+                content.classList.remove('scale-95');
+            }, 10);
+
+            scoreTxt.innerText = `${score} de ${total}`;
+
+            if (passed) {
+                icon.innerHTML = '<i class="fa-solid fa-trophy text-amber-400"></i>';
+                title.innerText = "Aprovado com Sucesso!";
+                title.className = "text-3xl font-black mb-2 text-emerald-600 uppercase tracking-wide";
+                scoreTxt.className = "text-5xl font-black text-emerald-600 drop-shadow-sm";
+                msg.innerHTML = `Fantástico! A sua pontuação foi de <strong>${pct}%</strong>. Você liberou o próximo módulo no mapa principal!`;
+                
+                if (currentActiveLevel === unlockedLevels) {
+                    unlockedLevels++;
+                    renderMap();
+                    updateProgress();
+                }
+            } else {
+                icon.innerHTML = '<i class="fa-solid fa-face-sad-tear text-rose-400"></i>';
+                title.innerText = "Quase lá...";
+                title.className = "text-3xl font-black mb-2 text-rose-500 uppercase tracking-wide";
+                scoreTxt.className = "text-5xl font-black text-rose-600 drop-shadow-sm";
+                const goal = (passTarget/total)*100;
+                msg.innerHTML = `Sua pontuação foi de <strong>${pct}%</strong>. Lembre-se que a meta de aprovação é <strong>${goal}%</strong>. Volte à teoria e tente de novo!`;
+            }
+        }
+
+        function closeModal() {
+            const modal = document.getElementById('result-modal');
+            const content = document.getElementById('modal-content');
+            
+            content.classList.add('scale-95');
+            setTimeout(() => {
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+                showScreen('map-screen');
+            }, 200);
+        }
+
+        document.addEventListener("DOMContentLoaded", initEngine);
+        if (document.readyState === "complete" || document.readyState === "interactive") {
+            setTimeout(initEngine, 1);
+        }
+    </script>
+</body>
+</html>
